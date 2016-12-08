@@ -188,7 +188,11 @@ def readMessagesFromConnection(conn):
     ''' Keep reading messages from the established connection until it is closed '''
 
     while True:
-        data = conn.recv(512)
+        try:
+            data = conn.recv(512)
+        except Exception as e:
+            break
+
         if not data:
             break
 
