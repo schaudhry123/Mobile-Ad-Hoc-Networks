@@ -27,9 +27,10 @@ def main(argv):
     global my_id
     my_id = argv[1]
     host, port = get_devices_info(argv[0])
+    algorithm = argv[2].lower()
 
     try:
-        server_thread = Thread(target=setup_server, args=(host, port))
+        server_thread = Thread(target=setup_server, args=(host, port, algorithm))
         server_thread.daemon = True
         server_thread.start()
     except:
@@ -37,7 +38,7 @@ def main(argv):
         sys.exit(0)
 
     try:
-        client_thread = Thread(target=setup_client, args=())
+        client_thread = Thread(target=setup_client, args=(algorithm, ))
         client_thread.daemon = True
         client_thread.start()
     except:
@@ -48,7 +49,7 @@ def main(argv):
         time.sleep(100)
 
 
-def setup_client():
+def setup_client(algorithm):
     ''' Reads in and handles input from the user '''
 
     global seq_num
@@ -65,13 +66,22 @@ def setup_client():
                 destination = int(user_input[5:])
                 seq_num += 1
 
-                message = {
-                    'source'        : my_id,
-                    'destination'   : destination,
-                    'initiator'     : my_id,
-                    'seq_num'       : seq_num
-                }
-                flood_send(message, devices)
+                if(algorithm == 'flooding'):
+                    message = {
+                        'source'        : my_id,
+                        'destination'   : destination,
+                        'initiator'     : my_id,
+                        'seq_num'       : seq_num
+                    }
+                    flood_send(message, devices, algorithm)
+                elif(algorithm == 'dsr'):
+                    message = {
+                        'path': [my_id],
+                        'destination': destination,
+                        'seq_num': seq_num,
+                        'initiator': my_id
+                    }
+                    flood_send(message, devices, algorithm)
 
             elif command[0] == 'add' and command[1] == 'connection':
                 user_input = raw_input('Enter the device information `<id> <host> <port>`: ').split()
@@ -112,9 +122,8 @@ def break_connection(device_id):
     print("Connection successfully broken.")
 
 
-def flood_send(message, device_list):
+def flood_send(message, device_list, algorithm):
     ''' Send a message out to all nearby neighbors '''
-
     message_hist.append((message['initiator'], message['seq_num']))
     print("Flood sending to {0}".format(device_list))
     for device in device_list:
@@ -124,14 +133,21 @@ def send_message(message, device):
     ''' Connect to the destination device and send a message to it, closing
         the socket after the message is sent '''
 
+    # print("device = {0}".format(device))
+
     try:
         s = create_connection(device)
+
+        if not s:
+            print("Error: Could not connect to device.")
+            return
+
         serialized_message = pickle.dumps(message, -1)
         s.send(serialized_message)
         s.close()
 
     except Exception as e:
-        print("Unable to connect to device " + str(device[0]) + ": {0}".format(e))
+        print("Unable to connect to device " + str(device['id']) + ": {0}".format(e))
 
 def create_connection(device):
     ''' Create a connection to the device and return the socket connection '''
@@ -147,7 +163,7 @@ def create_connection(device):
 
     return None
 
-def setup_server(host, port):
+def setup_server(host, port, algorithm):
     ''' Create the server and begin waiting for new connections '''
 
     connections = []
@@ -160,31 +176,14 @@ def setup_server(host, port):
     while True:
         conn, addr = s.accept()
         connections.append(conn)
-        conn_thread = Thread(target = readMessagesFromConnection, args = (conn,))
+        conn_thread = Thread(target = readMessagesFromConnection, args = (conn, algorithm, ))
         conn_thread.start()
 
     for conn in connections:
         conn.close()
     s.close()
 
-    # connections = []
-
-    # global s
-    # s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    # s.bind((host, port))
-    # s.listen(len(devices))
-
-    # while True:
-    #     conn, addr = s.accept()
-    #     connections.append(conn)
-    #     conn_thread = Thread(target = readMessagesFromConnection, args = (conn,))
-    #     conn_thread.start()
-
-    # for conn in connections:
-    #     conn.close()
-
-def readMessagesFromConnection(conn):
+def readMessagesFromConnection(conn, algorithm):
     ''' Keep reading messages from the established connection until it is closed '''
 
     while True:
@@ -197,29 +196,72 @@ def readMessagesFromConnection(conn):
             break
 
         message = pickle.loads(data)
-        source = message['source']
-        destination = message['destination']
-        message_id = (message['initiator'], message['seq_num'])
+        if('type' in message):
+            dsr_request_reply(message)
+        else:
+            destination = message['destination']
+            message_id = (message['initiator'], message['seq_num'])
 
-        if destination == int(my_id):
-            print("Reached the final destination!")
+            if destination == int(my_id):
+                print("Reached the final destination!")
+                if(algorithm == 'dsr'):
+                    #Send a Route Request Reply
+                    path = message['path']
+                    path.append(my_id)
+                    index = len(path) - 1
+                    message = {
+                        'type': 'rrep',
+                        'index': index - 1,
+                        'path': path
+                    }
+                    send_message(message, devices[message['index']])
+            elif message_id not in message_hist:
+                if(algorithm == 'flooding'):
+                    flood_receive(message)
+                elif(algorithm == 'dsr'):
+                    dsr_receive(message)
 
-        elif message_id not in message_hist:
-            print("Forwarding a message that was intended for {0} from {1}".format(destination, source))
-            flood_receive(message)
+def dsr_request_reply(message):
+    if(message['index'] == 0):
+        print('Received Route Request Reply along path: ' +  str(message['path']))
+        return
+    device_id = devices[message['index']]
+    message = {
+        'type': 'rrep',
+        'index': message['index'] - 1,
+        'path': message['path']
+    }
+    send_message(message, devices[message['index']])
 
 def flood_receive(message):
     ''' Recipient of a flood message that will forward it on to the correct neighbors '''
-
     source      = message['source']
     destination = message['destination']
     initiator   = message['initiator']
     seq_num     = message['seq_num']
 
+    print("Forwarding a message that was intended for {0} from {1}".format(destination, source))
     device_list = filter_devices(source, initiator)
 
     message = {
         'source'        : my_id,
+        'destination'   : destination,
+        'initiator'     : initiator,
+        'seq_num'       : seq_num
+    }
+    flood_send(message, device_list)
+
+def dsr_receive(message):
+    path = message['path']
+    destination = message['destination']
+    initiator   = message['initiator']
+    seq_num     = message['seq_num']
+
+    print("Forwarding a message that was intended for {0} from {1}".format(destination, path[-1]))
+    device_list = filter_devices(path[-1], initiator)
+
+    message = {
+        'path': path.append(my_id),
         'destination'   : destination,
         'initiator'     : initiator,
         'seq_num'       : seq_num
@@ -264,7 +306,7 @@ def handler(signum, frame):
 if __name__ == '__main__':
     signal.signal(signal.SIGINT, handler)
 
-    if len(sys.argv) < 3:
-        print("python {0} <config_file> <#>".format(sys.argv[0]))
+    if len(sys.argv) < 4:
+        print("python {0} <config_file> <#> <algorithm>".format(sys.argv[0]))
     else:
         main(sys.argv[1:])
