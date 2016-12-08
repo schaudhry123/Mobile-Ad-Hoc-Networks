@@ -241,10 +241,11 @@ def dsr_request_reply(message):
         print('Received Route Request Reply along path: ' +  str(message['path']))
         return
 
+    path = message['path']
     message = {
         'type': 'rrep',
         'index': message['index'] - 1,
-        'path': message['path']
+        'path': path
     }
     send_message(message, get_device_by_id(path[message['index']]))
 
