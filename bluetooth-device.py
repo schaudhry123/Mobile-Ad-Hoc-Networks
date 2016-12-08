@@ -167,7 +167,7 @@ def get_device_by_id(id):
     print("Getting device " + str(id))
     for device in devices:
         print("Comparing {0} and {1}".format(device['id'], id))
-        if int(device['id']) == id:
+        if device['id'] == id:
             print("Found!")
             return device
     print("nah!")
@@ -227,7 +227,7 @@ def readMessagesFromConnection(conn, algorithm):
                         'index': index - 1,
                         'path': path
                     }
-                    send_message(message, get_device_by_id(message['index']))
+                    send_message(message, get_device_by_id(path[message['index']]))
                     print("Finished sending message")
             elif message_id not in message_hist:
                 if(algorithm == 'flooding'):
@@ -240,13 +240,13 @@ def dsr_request_reply(message):
     if(message['index'] == 0):
         print('Received Route Request Reply along path: ' +  str(message['path']))
         return
-    device_id = devices[message['index']]
+
     message = {
         'type': 'rrep',
         'index': message['index'] - 1,
         'path': message['path']
     }
-    send_message(message, get_device_by_id(message['index']))
+    send_message(message, get_device_by_id(path[message['index']]))
 
 def flood_receive(message):
     ''' Recipient of a flood message that will forward it on to the correct neighbors '''
