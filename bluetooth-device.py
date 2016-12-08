@@ -164,13 +164,13 @@ def create_connection(device):
     return None
 
 def get_device_by_id(id):
-    print("Getting device " + str(id))
+    # print("Getting device " + str(id))
     for device in devices:
-        print("Comparing {0} and {1}".format(device['id'], id))
+        # print("Comparing {0} and {1}".format(device['id'], id))
         if device['id'] == id:
-            print("Found!")
+            # print("Found!")
             return device
-    print("nah!")
+    # print("nah!")
     return None
 
 def setup_server(host, port, algorithm):
@@ -220,7 +220,7 @@ def readMessagesFromConnection(conn, algorithm):
                     path.append(my_id)
                     index = len(path) - 1
 
-                    print("path = {0} and index = {1}".format(path, index))
+                    # print("path = {0} and index = {1}".format(path, index))
 
                     message = {
                         'type': 'rrep',
@@ -228,7 +228,7 @@ def readMessagesFromConnection(conn, algorithm):
                         'path': path
                     }
                     send_message(message, get_device_by_id(path[message['index']]))
-                    print("Finished sending message")
+                    # print("Finished sending message")
             elif message_id not in message_hist:
                 if(algorithm == 'flooding'):
                     flood_receive(message)
@@ -236,7 +236,7 @@ def readMessagesFromConnection(conn, algorithm):
                     dsr_receive(message)
 
 def dsr_request_reply(message):
-    print("Received a dsr request reply = {0}".format(message))
+    # print("Received a dsr request reply = {0}".format(message))
     if(message['index'] == 0):
         print('Received Route Request Reply along path: ' +  str(message['path']))
         return
