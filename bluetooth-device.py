@@ -73,7 +73,7 @@ def setup_client(algorithm):
                         'initiator'     : my_id,
                         'seq_num'       : seq_num
                     }
-                    flood_send(message, devices, algorithm)
+                    flood_send(message, devices)
                 elif(algorithm == 'dsr'):
                     message = {
                         'path': [my_id],
@@ -81,7 +81,7 @@ def setup_client(algorithm):
                         'seq_num': seq_num,
                         'initiator': my_id
                     }
-                    flood_send(message, devices, algorithm)
+                    flood_send(message, devices)
 
             elif command[0] == 'add' and command[1] == 'connection':
                 user_input = raw_input('Enter the device information `<id> <host> <port>`: ').split()
@@ -122,7 +122,7 @@ def break_connection(device_id):
     print("Connection successfully broken.")
 
 
-def flood_send(message, device_list, algorithm):
+def flood_send(message, device_list):
     ''' Send a message out to all nearby neighbors '''
     message_hist.append((message['initiator'], message['seq_num']))
     print("Flood sending to {0}".format(device_list))
