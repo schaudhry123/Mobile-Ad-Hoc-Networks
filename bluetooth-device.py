@@ -163,6 +163,12 @@ def create_connection(device):
 
     return None
 
+def get_device_by_id(id):
+    for device in devices:
+        if int(device['id']) == id:
+            return device
+    return None
+
 def setup_server(host, port, algorithm):
     ''' Create the server and begin waiting for new connections '''
 
@@ -209,12 +215,15 @@ def readMessagesFromConnection(conn, algorithm):
                     path = message['path']
                     path.append(my_id)
                     index = len(path) - 1
+
+                    print("path = {0} and index = {1}".format(path, index))
+
                     message = {
                         'type': 'rrep',
                         'index': index - 1,
                         'path': path
                     }
-                    send_message(message, devices[message['index']])
+                    send_message(message, get_device_by_id(index))
             elif message_id not in message_hist:
                 if(algorithm == 'flooding'):
                     flood_receive(message)
@@ -260,8 +269,9 @@ def dsr_receive(message):
     print("Forwarding a message that was intended for {0} from {1}".format(destination, path[-1]))
     device_list = filter_devices(path[-1], initiator)
 
+    path.append(my_id)
     message = {
-        'path': path.append(my_id),
+        'path': path,
         'destination'   : destination,
         'initiator'     : initiator,
         'seq_num'       : seq_num
