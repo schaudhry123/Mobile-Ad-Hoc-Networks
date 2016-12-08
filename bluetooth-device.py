@@ -150,6 +150,8 @@ def create_connection(device):
 def setup_server(host, port):
     ''' Create the server and begin waiting for new connections '''
 
+    connections = []
+
     global s
     s = bluetooth.BluetoothSocket( bluetooth.RFCOMM )
     s.bind(("", port))
